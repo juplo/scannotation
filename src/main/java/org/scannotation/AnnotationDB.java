@@ -50,6 +50,7 @@ public class AnnotationDB implements Serializable
    protected transient boolean scanFieldAnnotations = true;
    protected transient String[] ignoredPackages = {"javax", "java", "sun", "com.sun", "javassist"};
    protected transient String[] scanPackages = null;
+   protected transient boolean ignoreBadURLs = false;
 
    public class CrossReferenceException extends Exception
    {
@@ -110,7 +111,9 @@ public class AnnotationDB implements Serializable
     * This method will cross reference annotations in the annotation index with any meta-annotations that they have
     * and create additional entries as needed.  For example:
     *
-    * @HttpMethod("GET") public @interface GET {}
+    * <pre>
+    * @ HttpMethod("GET") public @interface GET {}
+    * </pre>
     * <p/>
     * The HttpMethod index will have additional classes added to it for any classes annotated with annotations that
     * have the HttpMethod meta-annotation.
@@ -168,7 +171,6 @@ public class AnnotationDB implements Serializable
     * a class's implemented interfaces.  The cross references will be added to the annotationIndex and
     * classIndex indexes
     *
-    * @param ignoredPackages var arg list of packages to ignore
     * @throws CrossReferenceException an Exception thrown if referenced interfaces haven't been scanned
     */
    public void crossReferenceImplementedInterfaces() throws CrossReferenceException
@@ -293,8 +295,18 @@ public class AnnotationDB implements Serializable
       this.scanFieldAnnotations = scanFieldAnnotations;
    }
 
+    /**
+     * Whether or not you want AnnotationDB to ignore bad URLs passed to scanArchives.
+     * Default is to throw an IOException.
+     *
+     * @param ignoreBadURLs
+     */
+    public void setIgnoreBadURLs(boolean ignoreBadURLs)
+    {
+        this.ignoreBadURLs = ignoreBadURLs;
+    }
 
-   /**
+    /**
     * Scan a url that represents an "archive"  this is a classpath directory or jar file
     *
     * @param urls variable list of URLs to scan as archives
@@ -320,10 +332,20 @@ public class AnnotationDB implements Serializable
             }
          };
 
-         StreamIterator it = IteratorFactory.create(url, filter);
+          try
+          {
+              StreamIterator it = IteratorFactory.create(url, filter);
 
-         InputStream stream;
-         while ((stream = it.next()) != null) scanClass(stream);
+              InputStream stream;
+              while ((stream = it.next()) != null) scanClass(stream);
+          }
+          catch (IOException e)
+          {
+              if (ignoreBadURLs)
+                  continue;
+              else
+                  throw e;
+          }
       }
 
    }
